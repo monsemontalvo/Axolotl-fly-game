@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 // Importar el cargador de materiales en formato MTL (Material Template Library)
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
-// NUEVO CAMBIO: Importar OrbitControls para el modo local, si se desea, o para depuración.
-// Por ahora, implementaremos el control de mouse manual.
+
 
 // ===================================
 // UTILERÍAS
 // ===================================
+// Función auxiliar para obtener parámetros de la URL 
 function getUrlParameter(name) {
     name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
     var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
@@ -17,103 +17,106 @@ function getUrlParameter(name) {
     return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
 }
 
+// Función para determinar qué skin usar según el índice recibido
 function obtenerRutaModelo(modelIndex) {
     if (modelIndex === 1) return 'models/AAR';
     if (modelIndex === 2) return 'models/AAA';
     return 'models/AAR';
 }
 
+// Obtiene configuración inicial desde la URL
 const gameMode = getUrlParameter('modo'); // 'local' o 'online'
-const playerName = getUrlParameter('nombre');
-const gameDifficulty = getUrlParameter('dificultad');
-const gameMap = getUrlParameter('map');
+const playerName = getUrlParameter('nombre'); // Nombre del jugador
+const gameDifficulty = getUrlParameter('dificultad'); // 'facil' o 'dificil'
+const gameMap = getUrlParameter('map'); // 'Desierto', 'Bosque', 'Montañas Nevadas'
 
 // ===================================
 // LEER CONFIGURACIÓN GUARDADA
 // ===================================
-const gameVolume = parseFloat(localStorage.getItem('gameVolume') || '0.5');
-const sfxMuted = (localStorage.getItem('sfxMuted') === 'true');
-const invertY = (localStorage.getItem('invertY') === 'true');
-const pauseVolumenSlider = document.getElementById('pauseVolumenSlider');
-if(pauseVolumenSlider) pauseVolumenSlider.value = gameVolume * 100;
+const gameVolume = parseFloat(localStorage.getItem('gameVolume') || '0.5'); // Leer volumen guardado
+const sfxMuted = (localStorage.getItem('sfxMuted') === 'true'); // Estado de muteo de efectos de sonido
+const invertY = (localStorage.getItem('invertY') === 'true'); // Invertir eje Y
+const pauseVolumenSlider = document.getElementById('pauseVolumenSlider'); // Referencia al slider de volumen en el menú de pausa
+if(pauseVolumenSlider) pauseVolumenSlider.value = gameVolume * 100; // Actualizar slider con valor guardado
 
 // ===================================
 // VARIABLES DE JUEGO Y RED
 // ===================================
-const socket = (gameMode === 'online') ? io() : null; 
-const canvas = document.getElementById('gameCanvas');
-const pauseMenu = document.getElementById('pauseMenu');
-const instructions = document.getElementById('instructions');
-const closeInstructions = document.getElementById('closeInstructions');
-const countdownOverlay = document.getElementById('countdownOverlay');
-const countdownText = document.getElementById('countdownText');
+const socket = (gameMode === 'online') ? io() : null; // Conexión Socket.IO solo en modo online
+const canvas = document.getElementById('gameCanvas'); // Referencia al canvas del juego
+const pauseMenu = document.getElementById('pauseMenu'); // Referencia al menú de pausa
+const instructions = document.getElementById('instructions'); // Referencia a las instrucciones
+const closeInstructions = document.getElementById('closeInstructions'); // Botón para cerrar instrucciones
+const countdownOverlay = document.getElementById('countdownOverlay'); // Overlay de cuenta regresiva
+const countdownText = document.getElementById('countdownText'); // Texto de cuenta regresiva
 
 // UI (Ambos Modos)
-const vidasContainer = document.getElementById('vidasContainer');
-const gameOverScreen = document.getElementById('gameOverScreen');
-const gameOverMessage = document.getElementById('gameOverMessage');
-const restartBtn = document.getElementById('restartBtn');
-const exitBtnGameOver = document.getElementById('exitBtnGameOver');
-const fuelBar = document.getElementById('fuelBar');
-const fuelContainer = document.getElementById('fuelContainer'); // NUEVO CAMBIO: Referencia al contenedor
+const vidasContainer = document.getElementById('vidasContainer'); // Contenedor de vidas
+const gameOverScreen = document.getElementById('gameOverScreen'); // Pantalla de fin de juego
+const gameOverMessage = document.getElementById('gameOverMessage'); // Mensaje de fin de juego
+const restartBtn = document.getElementById('restartBtn'); // Botón para reiniciar
+const exitBtnGameOver = document.getElementById('exitBtnGameOver'); // Botón para salir en fin de juego
+const fuelBar = document.getElementById('fuelBar'); // Barra de combustible
+const fuelContainer = document.getElementById('fuelContainer'); // Referencia al contenedor
 
 // UI Modo Online
-const waitingOverlay = document.getElementById('waitingOverlay');
-const player1ScoreUI = document.getElementById('player1Score');
-const player2ScoreUI = document.getElementById('player2Score');
-const player1ScoreText = player1ScoreUI.querySelector('span');
-const player2ScoreText = player2ScoreUI.querySelector('span');
+const waitingOverlay = document.getElementById('waitingOverlay'); // Overlay de espera en modo online
+const player1ScoreUI = document.getElementById('player1Score'); // Puntuación jugador 1
+const player2ScoreUI = document.getElementById('player2Score'); // Puntuación jugador 2
+const player1ScoreText = player1ScoreUI.querySelector('span'); // Span para texto de puntuación
+const player2ScoreText = player2ScoreUI.querySelector('span'); // Span para texto de puntuación
 
 // Párrafos de instrucciones
-const instructionsLocal = document.getElementById('instructions_local');
-const instructionsOnline = document.getElementById('instructions_online');
+const instructionsLocal = document.getElementById('instructions_local'); // Instrucciones modo local
+const instructionsOnline = document.getElementById('instructions_online'); // Instrucciones modo online
 
 
 // Aplicar volumen guardado a los audios
-const countdownSound = document.getElementById('countdownSound');
+const countdownSound = document.getElementById('countdownSound'); // Sonido de cuenta regresiva
 if(countdownSound) countdownSound.volume = gameVolume;
-const gameMusic = document.getElementById('gameMusic');
+const gameMusic = document.getElementById('gameMusic'); // Música del juego
 if(gameMusic) gameMusic.volume = gameVolume;
-const collisionSound = document.getElementById('collisionSound');
+const collisionSound = document.getElementById('collisionSound'); // Sonido de colisión
 if(collisionSound) collisionSound.volume = gameVolume;
-const coinSound = document.getElementById('coinSound');
+const coinSound = document.getElementById('coinSound'); // Sonido de moneda
 if(coinSound) coinSound.volume = gameVolume;
 
-let nombreJugador1 = playerName || "JugadorLocal";
-let localModelIndex = 0;
-let nombreJugador2 = "";
+let nombreJugador1 = playerName || "JugadorLocal"; // Nombre del jugador local
+let localModelIndex = 0; 
+let nombreJugador2 = ""; // Nombre del jugador remoto
 let paused = true; 
 const jugadoresRemotos = {}; 
 let obstaculos = []; 
-// NUEVO CAMBIO: Almacén de monedas activas
+
+//Almacén de monedas activas
 let activeCoins = {};
-let rain = null; // Variable para nuestro sistema de partículas de lluvia
+let rain = null; // Variable para sistema de partículas de lluvia
 
 // Variables de Control (MODO LOCAL)
 const velocidadAvance = 0.2; // Solo local
 const playerSpeed = 0.4; // Velocidad de movimiento WASD local
-const LIMITE_X_POS = 70;  
-const LIMITE_X_NEG = -70; 
-const LIMITE_Y_POS = 50;  
-const LIMITE_Y_NEG = -30; 
-const obstacleSpawnZ = -150; 
-const BOMB_AGGRO_RANGE = 50; 
+const LIMITE_X_POS = 70;  //Límites de movimiento local
+const LIMITE_X_NEG = -70; //Límites de movimiento local
+const LIMITE_Y_POS = 50;  //Límites de movimiento local
+const LIMITE_Y_NEG = -30; //Límites de movimiento local
+const obstacleSpawnZ = -150; // Distancia Z para spawnear obstáculos local
+const BOMB_AGGRO_RANGE = 50; //Rango de activación bomba
 const BOMB_HOMING_SPEED = 0.2; //Velocidad bomba 
-const STOP_SPAWN_ZONE = 150;
+const STOP_SPAWN_ZONE = 150; // Zona antes de la meta para dejar de spawnear obstáculos
 
 //Variables de Control (MODO ONLINE)
 const keyStates = {}; // Para un movimiento más suave
 let playerYaw = 0; // Rotación horizontal (mouse)
 let playerPitch = 0; // Rotación vertical (mouse)
-const mouseSensitivity = 0.002;
+const mouseSensitivity = 0.002; // Sensibilidad del mouse
 let arenaBounds = new THREE.Vector3(100, 100, 100); // Límites del cubo
 
 // Variables de Estado (para ambos modos)
-let vidas = 3;
-let distanciaRecorrida = 0;
-let gameOver = false;
-let maxFuel = 100;
-let fuel = maxFuel;
+let vidas = 3; // Número de vidas del jugador
+let distanciaRecorrida = 0; // Solo local
+let gameOver = false; // Estado de fin de juego
+let maxFuel = 100; // Combustible máximo
+let fuel = maxFuel; // Combustible actual
 const fuelDepletionRate = 0.05; // Gasto de combustible normal
 const fuelDepletionRateBoost = 0.07; // Gasto de combustible con turbo
 const fuelRefillAmount = 30; 
@@ -121,9 +124,9 @@ const fuelRefillAmount = 30;
 // ===================================
 // LÓGICA DE DIFICULTAD Y SPAWNEO
 // ===================================
-let distanciaMeta;
-let obstacleSpawnRate;
-let spawnableModels = [];
+let distanciaMeta; // Distancia a la meta
+let obstacleSpawnRate; // Tasa de spawneo de obstáculos
+let spawnableModels = []; // Modelos que se pueden spawnear
 
 const baseModels = [
     { path: 'models/bird', name: 'Bird', scale: new THREE.Vector3(0.5, 0.5, 0.5), type: 'obstacle' },
@@ -154,7 +157,7 @@ if (gameMode === 'local') {
         obstacleSpawnRate = 0.05; 
     }
     
-    player1ScoreUI.classList.add('hidden');
+    player1ScoreUI.classList.add('hidden'); 
     player2ScoreUI.classList.add('hidden');
     instructionsLocal.classList.remove('hidden');
     instructionsOnline.classList.add('hidden');
@@ -170,7 +173,7 @@ if (gameMode === 'local') {
             { path: 'models/bomb', name: 'Bomb', scale: new THREE.Vector3(3, 3, 3), type: 'homing_obstacle' }
         );
     }
-    // Las monedas (coin) se manejarán por el servidor.
+    // Las monedas (coin) se manejan por el servidor.
     
     player1ScoreUI.classList.remove('hidden');
     player2ScoreUI.classList.remove('hidden');
@@ -196,27 +199,27 @@ let AxoloteBB = new THREE.Box3();
 function initThree() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8); // Luz ambiental
     scene.add(ambientLight);
-    const dl = new THREE.DirectionalLight(0xffffff, 1);
+    const dl = new THREE.DirectionalLight(0xffffff, 1); // Luz direccional
     dl.position.set(15, 5, 5);
     scene.add(dl);
     
-    camera.position.z = 5; 
+    camera.position.z = 5; // Posición inicial de la cámara
 
-    // Definir ruta del mapa Y ruta del skybox
+    // Ruta del mapa Y ruta del skybox
     let mapModelPath = 'models/desierto'; // Default
-    let skyboxPath = 'skybox/'; // Default (para Desierto)
+    let skyboxPath = 'skybox/'; // Default 
 
     if (gameMap === 'Bosque') {
         mapModelPath = 'models/bosque';
-        skyboxPath = 'skybox/bosque/'; // <-- NUEVO
+        skyboxPath = 'skybox/bosque/'; 
     } else if (gameMap === 'Montañas Nevadas') {
         mapModelPath = 'models/nieve';
-        skyboxPath = 'skybox/nieve/'; // <-- NUEVO
+        skyboxPath = 'skybox/nieve/'; 
     }
 
-    // Cargar el Skybox (Ahora se hace una sola vez, ANTES del if/else de modo)
+    // Cargar el Skybox 
     const skyboxExt = '.png';
     const cubeTextureLoader = new THREE.CubeTextureLoader();
     const texture = cubeTextureLoader.load([
@@ -226,7 +229,7 @@ function initThree() {
     ]);
     scene.background = texture;
 
-    // ================== INICIO MODIFICACIÓN: AÑADIR LLUVIA ==================
+    // ================== PARTÍCULAS: LLUVIA ==================
     // Solo crear lluvia si estamos en el mapa de Bosque
     if (gameMap === 'Bosque') {
         if (gameMode === 'local') {
@@ -241,22 +244,21 @@ function initThree() {
             createRain(15000, rainBounds);
         }
     }
-    // ================== FIN MODIFICACIÓN: AÑADIR LLUVIA ==================
 
-    // ================== NUEVO: CONFIGURAR AGUA ==================
+    // ================== CONFIGURAR AGUA ==================
     waterTexture = textureLoader.load('models/water7.jpg');
     // Configurar la textura para que se repita
     waterTexture.wrapS = THREE.RepeatWrapping; // Repetir en horizontal (S)
     waterTexture.wrapT = THREE.RepeatWrapping; // Repetir en vertical (T)
     
-    waterMaterial = new THREE.MeshLambertMaterial({ // <-- CAMBIO AQUÍ
+    waterMaterial = new THREE.MeshLambertMaterial({ 
     map: waterTexture, 
     transparent: true, 
-    opacity: 0.8 // Puedes ajustar la opacidad
+    opacity: 0.8 
 });
     // ==========================================================
 
-    // ================== FIN DE LA MODIFICACIÓN ==================
+
 
     if (gameMode === 'local') {
         // MODO LOCAL: Pista lineal
@@ -264,10 +266,9 @@ function initThree() {
         const metaPosition = new THREE.Vector3(0, -40, -distanciaMeta);
         cargarModeloEstatico(mapModelPath, gameMap, new THREE.Vector3(7, 7, 7), metaPosition); //Escala mapa final 
     
-        // --- NUEVO: Crear Suelo de Agua (Local) ---
-        // Un plano MUY largo que cubra toda la pista
+        // -- Suelo de Agua (Local) ---
         const waterGeo = new THREE.PlaneGeometry(3000, distanciaMeta + 1000); // Ancho 3000, Largo total
-        // Repetir la textura (ej: 10 veces a lo ancho, y proporcional a lo largo)
+        // Repetir la textura 
         const repeatX = 10;
         const repeatY = (distanciaMeta + 1000) / (3000 / repeatX);
         waterTexture.repeat.set(repeatX, repeatY);
@@ -286,7 +287,6 @@ function initThree() {
         const arenaSize = 200;
         arenaBounds = new THREE.Vector3(arenaSize/2, arenaSize/2, arenaSize/2);
     
-        // Opcional: añadir un 'suelo' visual o usar el modelo del mapa
         cargarModeloEstatico(
             mapModelPath, 
             gameMap, 
@@ -294,8 +294,7 @@ function initThree() {
             new THREE.Vector3(0, -arenaBounds.y + 10, 0) // En el fondo
         );
 
-        // --- NUEVO: Crear Suelo de Agua (Online) ---
-        // Un plano grande que cubra el fondo de la arena
+        // --- Crear Suelo de Agua (Online) ---
         const waterGeo = new THREE.PlaneGeometry(arenaBounds.x * 2, arenaBounds.z * 2);
         // Repetir la textura 10x10 sobre el plano
         waterTexture.repeat.set(10, 10); 
@@ -382,7 +381,7 @@ function cargarModeloEstatico(path, nombre, vectorEscala, posicion) {
     });
 }
 
-// NUEVO CAMBIO: Cargar item ahora acepta ID único (para monedas)
+// Cargar ítem (obstáculo, combustible, vida, bomba, moneda)
 function cargarItem(path, nombre, vectorEscala, posicion, tipo, uniqueId = null) {
     const itemMtlLoader = new MTLLoader();
     const itemObjLoader = new OBJLoader();
@@ -393,7 +392,6 @@ function cargarItem(path, nombre, vectorEscala, posicion, tipo, uniqueId = null)
         
         itemObjLoader.load(path + '.obj',
             function (object) {
-                // Usar ID único si se provee (para monedas), si no, nombre genérico
                 object.name = uniqueId || (nombre + '_' + Math.random());
                 object.scale.copy(vectorEscala);
                 object.position.copy(posicion);
@@ -429,7 +427,7 @@ function cargarItem(path, nombre, vectorEscala, posicion, tipo, uniqueId = null)
 function createRain(particleCount, bounds) {
     const particles = new THREE.BufferGeometry();
     const positions = [];
-    const velocities = []; // Almacenaremos la velocidad de caída de cada gota
+    const velocities = []; // Velocidad de caída de cada gota
 
     for (let i = 0; i < particleCount; i++) {
         // Posición inicial aleatoria dentro de los límites (bounds)
@@ -439,7 +437,7 @@ function createRain(particleCount, bounds) {
             (Math.random() - 0.5) * bounds.z  // z
         );
 
-        // Damos a cada gota una velocidad de caída ligeramente diferente
+        // Velocidad de caída ligeramente diferente
         velocities.push(
             0, // No se mueve en x
             (Math.random() * 0.5 + 0.5) * 2, // Velocidad en Y (entre 1.0 y 2.0)
@@ -460,7 +458,7 @@ function createRain(particleCount, bounds) {
 
     rain = new THREE.Points(particles, material);
     
-    // Lo hacemos un hijo de la escena
+    // Objeto personalizado para actualizar las partículas
     scene.add(rain);
 }
 
@@ -538,14 +536,14 @@ if (socket) {
     });
 
     socket.on('UpdateScores', (scores) => {
-        // NUEVO CAMBIO: Asegurarse de que el score se muestre correctamente
+        // Asegurarse de que el score se muestre correctamente
         const myScoreData = scores.find(s => s.name === nombreJugador1);
         const otherPlayerData = scores.find(s => s.name !== nombreJugador1);
 
         if (myScoreData) {
             player1ScoreText.textContent = myScoreData.score;
         } else {
-             player1ScoreText.textContent = "0"; // Asegurar que mi score se muestre
+             player1ScoreText.textContent = "0"; 
         }
 
         if (otherPlayerData) {
@@ -555,7 +553,7 @@ if (socket) {
         }
     });
 
-    // NUEVO CAMBIO: Recibir posición Y ROTACIÓN
+    // Recibir posición Y ROTACIÓN
     socket.on('Posicion', (data) => {
         if (data.name !== nombreJugador1) {
             const remoteNameKey = `RemotePlayer_${data.name}`;
@@ -568,7 +566,7 @@ if (socket) {
         }
     });
 
-    // NUEVO CAMBIO: Listeners para monedas
+    // Listeners para monedas
     socket.on('SpawnCoin', (coinData) => {
         cargarItem(
             'models/coin',
@@ -588,7 +586,7 @@ if (socket) {
         }
     });
     
-    // NUEVO CAMBIO: Listener para respawn por penalización
+    // Listener para respawn por penalización
     socket.on('RespawnPlayer', () => {
         if (objAxolote) {
             // Respawn en un lugar aleatorio dentro de la arena
@@ -622,7 +620,7 @@ if (socket) {
         paused = true;
         if (gameMusic) gameMusic.pause();
         
-        // NUEVO CAMBIO: Salir del Pointer Lock si está activo
+        // Salir del Pointer Lock si está activo
         document.exitPointerLock();
 
         gameOverScreen.classList.remove('hidden');
@@ -634,7 +632,7 @@ if (socket) {
 
         if (winnerName === "EMPATE") {
             message = translations['game_over_online_tie'] || "IT'S A TIE!";
-        // NUEVO CAMBIO: Nuevas razones de Game Over
+        // Nuevas razones de Game Over
         } else if (data.reason === 'coins_finished') {
              message = (translations['game_over_online_score'] || "{winner} WINS BY COINS!")
                       .replace('{winner}', winnerName);
@@ -662,7 +660,7 @@ function animate() {
     }
 
     if (paused) {
-        // NUEVO CAMBIO: Detener el mouse lock si pausamos
+        // Detener el mouse lock si pausamos
         if (gameMode === 'online' && document.pointerLockElement === canvas) {
             document.exitPointerLock();
         }
@@ -670,7 +668,7 @@ function animate() {
         return; 
     }
 
-    // NUEVO CAMBIO: Asegurarse que el mouse esté bloqueado en online
+    // Asegurarse que el mouse esté bloqueado en online
     if (gameMode === 'online' && document.pointerLockElement !== canvas) {
         // Mostrar un mensaje para hacer clic si es necesario
     }
@@ -679,7 +677,7 @@ function animate() {
     if (objAxolote) {
 
         if (gameMode === 'local') {
-            // --- LÓGICA DE MOVIMIENTO LOCAL (SIN CAMBIOS) ---
+            // --- LÓGICA DE MOVIMIENTO LOCAL---
             objAxolote.position.z -= velocidadAvance;
             distanciaRecorrida += velocidadAvance;
             fuel -= fuelDepletionRate;
@@ -696,11 +694,11 @@ function animate() {
             }
 
         } else {
-            // --- NUEVO CAMBIO: LÓGICA DE MOVIMIENTO ONLINE ---
+            // --- LÓGICA DE MOVIMIENTO ONLINE ---
             actualizarMovimientoOnline();
             actualizarCamaraOnline();
             
-            // Spawneo de obstáculos (combustible, etc.)
+            // Spawneo de obstáculos
             if (Math.random() < obstacleSpawnRate * 0.1) { // Menos frecuente
                 spawnItemOnline();
             }
@@ -725,8 +723,7 @@ function animate() {
                     continue;
                 }
             } else {
-                // En online, los objetos no se mueven, así que no los borramos por Z
-                // Podríamos borrarlos por distancia si se acumulan muchos
+                // En online, los objetos no se mueven
             }
 
 
@@ -747,7 +744,7 @@ function animate() {
             }
         }
         
-        // NUEVO CAMBIO: Colisión con Monedas (Solo Online)
+        // Colisión con Monedas (Solo Online)
         if (gameMode === 'online') {
             const coinIds = Object.keys(activeCoins);
             for (const coinId of coinIds) {
@@ -771,7 +768,7 @@ function animate() {
             }
         } 
         else if (gameMode === 'online' && !gameOver) {
-            // NUEVO CAMBIO: Penalización por combustible
+            // Penalización por combustible
             if (fuel <= 0) {
                 if (socket) {
                     socket.emit('PlayerHitPenalty'); // Avisar al servidor
@@ -781,16 +778,16 @@ function animate() {
         }
     }
     
-    // ================== INICIO MODIFICACIÓN: ANIMAR LLUVIA ==================
+    // ================== ANIMAR LLUVIA ==================
     if (rain) {
-        // 1. Mover la caja de lluvia con el jugador (SOLO MODO LOCAL)
+        // Mover la caja de lluvia con el jugador (SOLO MODO LOCAL)
         if (gameMode === 'local' && objAxolote) {
             // Centramos la caja de lluvia un poco delante del jugador
             rain.position.z = objAxolote.position.z - 150;
             rain.position.x = objAxolote.position.x;
         }
 
-        // 2. Animar las gotas individuales
+        // Animar las gotas individuales
         const positions = rain.geometry.attributes.position.array;
         const velocities = rain.geometry.attributes.velocity.array;
         const bounds = (gameMode === 'local') ? new THREE.Vector3(200, 100, 300) : new THREE.Vector3(arenaBounds.x * 2, arenaBounds.y * 2, arenaBounds.z * 2);
@@ -810,7 +807,7 @@ function animate() {
             }
         }
 
-        // Importante: Notificar a Three.js que las posiciones han cambiado
+        // Notificar a Three.js que las posiciones han cambiado
         rain.geometry.attributes.position.needsUpdate = true;
     }
     // ================== FIN MODIFICACIÓN: ANIMAR LLUVIA ==================
@@ -818,7 +815,7 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// NUEVO CAMBIO: Lógica de movimiento online
+// Lógica de movimiento online
 function actualizarMovimientoOnline() {
     if (!objAxolote) return;
 
@@ -867,7 +864,7 @@ function actualizarMovimientoOnline() {
     }
 }
 
-// NUEVO CAMBIO: Lógica de cámara online
+// Lógica de cámara online
 function actualizarCamaraOnline() {
     if (!objAxolote) return;
     
@@ -904,7 +901,7 @@ function spawnItemLocal() {
     );
 }
 
-// NUEVO CAMBIO: Spawneo de items en online (solo combustible y bombas)
+// Spawneo de items en online (solo combustible y bombas)
 function spawnItemOnline() {
     // Filtrar solo combustible y obstáculos
     const onlineSpawnable = spawnableModels.filter(m => m.type === 'fuel' || m.type === 'obstacle' || m.type === 'homing_obstacle');
@@ -927,7 +924,7 @@ function spawnItemOnline() {
     );
 }
 
-// NUEVO CAMBIO: handleCollision modificado
+// HandleCollision modificado
 function handleCollision(obstacleIndex, type, coinId = null) {
     
     switch (type) {
@@ -951,7 +948,7 @@ function handleCollision(obstacleIndex, type, coinId = null) {
             
         case 'homing_obstacle':
         case 'obstacle':
-            // Es un obstáculo (Diferente lógica para local/online)
+            // Es un obstáculo 
             if (obstacleIndex === null) return;
             const itemToRemoveObs = obstaculos.splice(obstacleIndex, 1)[0];
             if (itemToRemoveObs) {
@@ -1073,13 +1070,13 @@ document.addEventListener('keydown', (e) => {
     
     if (paused) {
         gameMusic.pause();
-        // NUEVO CAMBIO: Liberar mouse si pausamos en online
+        // Liberar mouse si pausamos en online
         if (gameMode === 'online') {
             document.exitPointerLock();
         }
     } else {
         gameMusic.play().catch(e => {});
-        // NUEVO CAMBIO: Bloquear mouse si reanudamos en online
+        // Bloquear mouse si reanudamos en online
         if (gameMode === 'online') {
             canvas.requestPointerLock();
         }
@@ -1091,7 +1088,7 @@ document.getElementById('resumeBtn').addEventListener('click', () => {
     paused = false;
     pauseMenu.classList.add('hidden');
     gameMusic.play().catch(e => {});
-    // NUEVO CAMBIO: Bloquear mouse si reanudamos en online
+    // Bloquear mouse si reanudamos en online
     if (gameMode === 'online') {
         canvas.requestPointerLock();
     }
@@ -1118,7 +1115,7 @@ pauseVolumenSlider.addEventListener('input', (e) => {
 });
 
 // ===================================
-// NUEVO CAMBIO: SISTEMA DE CONTROL REFACTORIZADO
+// SISTEMA DE CONTROL REFACTORIZADO
 // ===================================
 
 // Control MODO LOCAL (Teclado Simple)
@@ -1192,7 +1189,7 @@ function handleInstructionsClose() {
     if (gameMode === 'online' && socket) {
         console.log("handleInstructionsClose: Modo ONLINE. Enviando 'PlayerReady'...");
         socket.emit('PlayerReady');
-        // NUEVO CAMBIO: Bloquear mouse al inicio
+        // Bloquear mouse al inicio
         canvas.requestPointerLock();
     } else {
         console.log("handleInstructionsClose: Modo LOCAL. Iniciando cuenta...");

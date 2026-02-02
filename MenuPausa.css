@@ -63,7 +63,7 @@ body, html {
   max-width: 80%;
 }
 
-/* NUEVO: Ocultar párrafos de instrucciones */
+/*  Ocultar párrafos de instrucciones */
 #instructions_desc_local.hidden,
 #instructions_desc_online.hidden {
   display: none;
@@ -92,7 +92,7 @@ body, html {
 }
 
 /* =================================== */
-/* ===== NUEVOS ESTILOS DE UI ===== */
+/* ===== ESTILOS DE UI ===== */
 /* =================================== */
 
 /* Contenedor de Vidas */
@@ -236,7 +236,7 @@ body, html {
 }
 
 /* =================================== */
-/* ===== NUEVO: ESTILOS OVERLAY DE ESPERA ===== */
+/* ===== ESTILOS OVERLAY DE ESPERA ===== */
 /* =================================== */
 
 /* Usamos un fondo de cielo, similar a despegando.css */
@@ -280,7 +280,7 @@ body, html {
 }
 
 /* =================================== */
-/* ===== NUEVO: ESTILOS CONTADOR MONEDAS ===== */
+/* ===== ESTILOS CONTADOR MONEDAS ===== */
 /* =================================== */
 
 .score-display {

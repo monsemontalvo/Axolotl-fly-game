@@ -2,39 +2,35 @@ const express = require('express');
 const { createServer } = require('node:http');
 const { join } = require('node:path');
 const { Server } = require('socket.io');
-const mongoose = require('mongoose'); // <-- 1. IMPORTAR MONGOOSE
+const mongoose = require('mongoose'); // <-- IMPORTAR MONGOOSE
 
 const app = express();
 const server = createServer(app);
 const io = new Server(server);
 
-// --- 2. CONEXIÓN A MONGODB ---
-// (Asegúrate de tener MongoDB corriendo localmente)
+// --- CONEXIÓN A MONGODB ---
 mongoose.connect('mongodb://localhost:27017/axolotlgame')
   .then(() => console.log('Conectado a MongoDB...'))
   .catch(err => console.error('No se pudo conectar a MongoDB...', err));
 
-// --- 3. MODELO DE PUNTUACIÓN ---
-// Define cómo se guardarán los datos en la colección 'scores'
+// -- MODELO DE PUNTUACIÓN ---
 const Score = mongoose.model('Score', new mongoose.Schema({
     playerName: String,
     score: Number,
     date: { type: Date, default: Date.now }
 }));
-// --- FIN DE NUEVO CÓDIGO ---
 
-
-// Almacén de jugadores. Usaremos un Objeto para acceso rápido por ID
+// Almacén de jugadores. 
 const players = {}; 
 
 // ===================================
-// NUEVO CAMBIO: ESTADO DEL JUEGO ONLINE
+// ESTADO DEL JUEGO ONLINE
 // ===================================
 let gameState = 'waiting'; // waiting, playing, finished
-const TOTAL_COINS = 50;
-const COINS_PER_BATCH = 10;
+const TOTAL_COINS = 50; //Total monedas
+const COINS_PER_BATCH = 10; //Total monedas por seccion 
 const COIN_SPAWN_INTERVAL = 10000; // 10 segundos
-const ARENA_BOUNDS = 100; // Mitad del tamaño del cubo (ej. 200 de lado)
+const ARENA_BOUNDS = 100; // Mitad del tamaño del cubo 
 
 let coinsSpawnedCount = 0;
 let coinsCollectedCount = 0;
@@ -72,7 +68,7 @@ function checkAllReady() {
   return Object.values(players).every(p => p.ready);
 }
 
-// NUEVO CAMBIO: Reseteo completo del estado del juego
+// Reseteo completo del estado del juego
 function resetGameState() {
     console.log("--- RESETEANDO ESTADO DEL JUEGO ---");
     // Resetear jugadores
@@ -94,8 +90,7 @@ function resetGameState() {
 }
 // --- Fin Helpers ---
 
-// --- 4. NUEVA FUNCIÓN PARA GUARDAR PUNTUACIONES ---
-// Esta función reemplazará la lógica de "GameOver"
+// --- FUNCIÓN PARA GUARDAR PUNTUACIONES ---
 async function saveGameScores(reason) {
     // Evitar guardado doble si el juego ya terminó
     if (gameState !== 'playing') return; 
@@ -139,7 +134,6 @@ async function saveGameScores(reason) {
     // Resetear estado para la próxima partida
     resetGameState();
 }
-// --- FIN DE NUEVA FUNCIÓN ---
 
 
 app.use(express.static(join(__dirname, '')));
@@ -149,8 +143,7 @@ app.get('/', (req, res) => {
   res.sendFile(join(__dirname, 'index.html'));
 });
 
-// --- 5. RUTA PARA OBTENER PUNTUACIONES ---
-// Agrega esto ANTES de io.on('connection')
+// -- RUTA PARA OBTENER PUNTUACIONES ---
 app.get('/getHighScores', async (req, res) => {
     try {
         const highScores = await Score.find()  // Busca en la colección
@@ -163,17 +156,15 @@ app.get('/getHighScores', async (req, res) => {
         res.status(500).json({ error: 'Error al obtener puntuaciones' });
     }
 });
-// --- FIN DE NUEVA RUTA ---
 
 // ===================================
-// NUEVO CAMBIO: LÓGICA DE INICIO Y SPAWN
+// LÓGICA DE INICIO Y SPAWN
 // ===================================
 function startGame() {
     if (gameState === 'playing') return; // Evitar doble inicio
     
     console.log("--- INICIANDO JUEGO ---");
-    // resetGameState() AHORA SE LLAMA DESDE saveGameScores() o al desconectar
-    // Aquí solo ajustamos el estado
+    
     gameState = 'playing';
     coinsSpawnedCount = 0;
     coinsCollectedCount = 0;
@@ -275,7 +266,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // NUEVO CAMBIO: Recibir Posición Y Rotación
+  // Recibir Posición Y Rotación
   socket.on('Posicion', (posicion, rotacion, nombre) => {
     const player = getPlayerById(socket.id);
     if (player) {
@@ -304,7 +295,7 @@ io.on('connection', (socket) => {
   });
 
   // ===================================
-  // NUEVO CAMBIO: LÓGICA DE MONEDAS Y PENALIZACIÓN
+  // LÓGICA DE MONEDAS Y PENALIZACIÓN
   // ===================================
 
   socket.on('CoinCollected', (data) => {
@@ -330,8 +321,6 @@ io.on('connection', (socket) => {
       // --- CHEQUEO DE FIN DE PARTIDA ---
       if (coinsCollectedCount >= TOTAL_COINS) {
         console.log("--- JUEGO TERMINADO: MONEDAS RECOLECTADAS ---");
-        // ANTES: Lógica de GameOver aquí
-        // AHORA: Llamar a la función de guardado
         saveGameScores('coins_finished');
       }
     }
@@ -366,11 +355,11 @@ io.on('connection', (socket) => {
       
       const remainingPlayer = getOtherPlayer(socket.id); // 'getOtherPlayer' ya no lo encontrará
       
-      // NUEVO CAMBIO: Si el juego estaba en curso y uno se va, el otro gana
+      // Si el juego estaba en curso y uno se va, el otro gana
       if (remainingPlayer && gameState === 'playing') { 
         console.log("Jugador desconectado en plena partida. El otro gana.");
-        // ANTES: io.emit('GameOver', ...)
-        // AHORA: Llamar a la función de guardado
+        // io.emit('GameOver', ...)
+        // Llamar a la función de guardado
         saveGameScores('disconnect');
       }
       

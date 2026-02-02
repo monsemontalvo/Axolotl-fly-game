@@ -84,7 +84,7 @@ function handleFBLogin() {
   }, {scope: 'public_profile'}); // Pedimos info básica
 }
 
-// NUEVA Función de Logout
+// Función de Logout
 function handleFBLogout() {
   FB.logout(function(response) {
     console.log('Logout exitoso.');
@@ -92,7 +92,7 @@ function handleFBLogout() {
   });
 }
 
-// Añadir el listener al botón de Facebook (NUEVO)
+// Añadir el listener al botón de Facebook 
 document.addEventListener('DOMContentLoaded', () => {
     // Asignar el listener inicial. Se cambiará dinámicamente
     const fbLoginBtn = document.getElementById('fbLoginBtn');
@@ -120,8 +120,7 @@ function cerrarModal(id) {
   document.getElementById(id).style.display = "none";
 }
 
-// --- 2. NUEVA FUNCIÓN ---
-// Esta función buscará los scores en el servidor
+// Buscar los scores en el servidor
 async function cargarPuntuaciones() {
     const listaUl = document.querySelector('#scoreModal .lista-puntuaciones');
     if (!listaUl) return;
@@ -155,7 +154,7 @@ async function cargarPuntuaciones() {
         listaUl.innerHTML = '<li>Error al cargar las puntuaciones.</li>';
     }
 }
-// --- FIN DE NUEVA FUNCIÓN ---
+
 
 
 // --- Lógica de Configuración (Tu código existente) ---
